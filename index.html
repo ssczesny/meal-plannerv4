@@ -107,7 +107,7 @@
                     </div>
                 </div>
 
-                <!-- NEW: Recipe Generator Section -->
+                <!-- Recipe Generator Section -->
                 <div class="bg-purple-50 p-6 rounded-lg shadow">
                     <h4 class="text-xl font-semibold text-purple-800 mb-4 flex items-center">
                         <svg class="mr-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.52c-2.29-2.28-5.48-.7-6.75 1.4-1.32 2.15.26 5.25 3.75 8.1 1.13.94 2.4 1.93 3 2.5.6-.57 1.87-1.56 3-2.5 3.5-2.85 5.07-5.95 3.75-8.1-1.27-2.1-4.46-3.68-6.75-1.4z"></path></svg>
@@ -430,10 +430,16 @@
             
             // --- AI FEATURE API CALLS ---
             const callGeminiAPI = async (payload) => {
-                // IMPORTANT: The API key is handled by the execution environment.
-                // Do not hardcode your key here for security reasons.
-                const apiKey = ""; 
+                // IMPORTANT: PASTE YOUR API KEY HERE
+                // Get your own key from Google AI Studio: https://aistudio.google.com/
+                // WARNING: Do not share this code publicly with your API key in it!
+                const apiKey = "AIzaSyDHk-HtvcOwVQlrPPYbO1xwlu3guKyvm6o"; // <--- YOUR KEY IS HERE
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                if (!apiKey) {
+                    return { error: "API key is missing. Please get a key from Google AI Studio and paste it into the script." };
+                }
+
                 try {
                     const response = await fetch(apiUrl, {
                         method: 'POST',
@@ -441,25 +447,30 @@
                         body: JSON.stringify(payload)
                     });
                     if (!response.ok) {
+                        if (response.status === 400) {
+                             return { error: "API call failed: Bad request. This is likely due to an invalid or missing API key." };
+                        }
                         const errorBody = await response.text();
                         console.error("API Error Response:", errorBody);
-                        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                        return { error: `API Error: ${response.status} ${response.statusText}. Check the console for more details.`};
                     }
                     return await response.json();
                 } catch (error) {
                     console.error("Error calling Gemini API:", error);
-                    return null;
+                    return { error: "An unexpected network error occurred. Check the browser console for details." };
                 }
             };
             
             const handleGenerateRecipe = async () => {
                 const dinner = document.getElementById('dinner-input').value;
+                const recipeDisplay = document.getElementById('recipe-display');
+
                 if (!dinner) {
-                    alert("Please enter a dinner idea first!");
+                    recipeDisplay.classList.remove('hidden');
+                    recipeDisplay.innerHTML = `<p class="text-red-500 font-bold">Please enter a dinner idea first!</p>`;
                     return;
                 }
                 
-                const recipeDisplay = document.getElementById('recipe-display');
                 recipeDisplay.classList.remove('hidden');
                 recipeDisplay.innerHTML = `<div class="flex justify-center items-center h-24"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div><p class="ml-4 text-gray-600">Crafting your recipe...</p></div>`;
 
@@ -475,9 +486,13 @@
                 const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
                 const result = await callGeminiAPI(payload);
 
+                if (result.error) {
+                    recipeDisplay.innerHTML = `<p class="text-red-500 font-bold">Error:</p><p class="text-red-500">${result.error}</p>`;
+                    return;
+                }
+
                 if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
                     let text = result.candidates[0].content.parts[0].text;
-                    // Improved formatting for better readability
                     text = text.replace(/\*\*(.*?)\*\*/g, '<h3>$1</h3>') 
                                .replace(/### (.*?)\n/g, '<h3>$1</h3>')
                                .replace(/## (.*?)\n/g, '<h2>$1</h2>')
@@ -485,7 +500,7 @@
                                .replace(/\n/g, '<br>');
                     recipeDisplay.innerHTML = text;
                 } else {
-                    recipeDisplay.innerHTML = `<p class="text-red-500">Sorry, I couldn't generate a recipe for that. Please try a different idea or check the console for errors.</p>`;
+                    recipeDisplay.innerHTML = `<p class="text-red-500">Sorry, I couldn't generate a recipe for that. The AI returned an empty response.</p>`;
                 }
             };
             
@@ -509,6 +524,12 @@
                 const result = await callGeminiAPI(payload);
                 
                 resultsDiv.innerHTML = '';
+
+                if (result.error) {
+                    resultsDiv.innerHTML = `<p class="text-red-500 font-bold text-center">Error: ${result.error}</p>`;
+                    return;
+                }
+
                 if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
                     try {
                         const parsedJson = JSON.parse(result.candidates[0].content.parts[0].text);
@@ -531,7 +552,7 @@
                         resultsDiv.innerHTML = `<p class="text-red-500 text-center">Received an invalid format from the AI. Please try again.</p>`;
                     }
                 } else {
-                    resultsDiv.innerHTML = `<p class="text-red-500 text-center">Sorry, an error occurred.</p>`;
+                    resultsDiv.innerHTML = `<p class="text-red-500 text-center">Sorry, an error occurred and the AI returned an empty response.</p>`;
                 }
             };
 
@@ -575,6 +596,11 @@
                 const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
                 const result = await callGeminiAPI(payload);
 
+                if (result.error) {
+                    contentDiv.innerHTML = `<p class="text-red-500 font-bold">Error:</p><p class="text-red-500">${result.error}</p>`;
+                    return;
+                }
+
                 if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
                     let text = result.candidates[0].content.parts[0].text;
                     text = text.replace(/\*\*(.*?)\*\*/g, '<h3>$1</h3>')
@@ -584,7 +610,7 @@
                                .replace(/\n/g, '<br>');
                     contentDiv.innerHTML = text;
                 } else {
-                    contentDiv.innerHTML = "Could not generate a shopping list at this time.";
+                    contentDiv.innerHTML = "Could not generate a shopping list at this time. The AI returned an empty response.";
                 }
             };
 
